@@ -34,11 +34,11 @@ class Doubleconv(nn.Module):
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
             nn.LeakyReLU(0.2),
-            nn.Dropout2d(0.1),
+            # nn.Dropout2d(0.1),
             nn.BatchNorm2d(mid_channels),
             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
             nn.LeakyReLU(0.2),
-            nn.Dropout2d(0.1),
+            # nn.Dropout2d(0.1),
             nn.BatchNorm2d(out_channels),
         )
 
@@ -49,7 +49,8 @@ class Up(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(Up, self).__init__()
         self.deconv_conv = nn.Sequential(
-            nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(in_channels, in_channels, kernel_size=3, stride=2, padding=1, output_padding=1),
+            # nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2),
             Doubleconv(in_channels, out_channels),
         )
 
@@ -61,7 +62,8 @@ class Down(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(Down, self).__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, kernel_size=2, stride=2),
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=2, padding=1),
+            # nn.Conv2d(in_channels, in_channels, kernel_size=2, stride=2),
             Doubleconv(in_channels, out_channels)
         )
 
@@ -74,6 +76,13 @@ class SimpleAEGAN(nn.Module):
         super(SimpleAEGAN, self).__init__()
         # self.kernel_size = 3
         # self.padding = self.kernel_size // 2
+        if isinstance(input_size, int):
+            self.input_size = (int(input_size), int(input_size))
+        elif isinstance(input_size, (tuple, list)) and len(input_size) == 2:
+            self.input_size = tuple(input_size)
+        else:
+            print('input_size error!')
+            exit(-1)
         self.ae_level = ae_level
         self.init_channel_in = 3
         self.init_channel_out = 64
@@ -92,7 +101,7 @@ class SimpleAEGAN(nn.Module):
             self.discriminator_layers.append(Down(self.init_channel_out * (2**l), self.init_channel_out * (2**l) * 2))
         self.discriminator_layers = self.discriminator_layers + [nn.Conv2d(self.init_channel_out * (2**self.ae_level), self.init_channel_out * (2**self.ae_level), kernel_size=1),
                                         nn.Flatten(),
-                                        nn.Linear(self.init_channel_out * (2**self.ae_level) * ((input_size // (2**self.ae_level))**2), 1),
+                                        nn.Linear(self.init_channel_out * (2**self.ae_level) * ((self.input_size[0] // (2**self.ae_level)) * (self.input_size[1] // (2**self.ae_level))), 1),
                                         nn.Sigmoid()]
         self.discriminator = nn.Sequential(*self.discriminator_layers)
 

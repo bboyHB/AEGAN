@@ -13,7 +13,7 @@ from simple_aegan import SimpleAEGAN
 
 
 input_size = 160
-ae_level = 2
+ae_level = 3
 trans2tensor = transforms.Compose([
     transforms.Resize((input_size, input_size)),
     transforms.ToTensor(),
@@ -25,7 +25,7 @@ show_interval = 100
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 def train():
-    data_path = 'C:/Users/DeepLearning/Desktop/flaw_detect/img/test/commom1'
+    data_path = 'C:/Users/DeepLearning/Desktop/flaw_detect/img/test/commom1'  # '../defect_generate_gan/defect_samples'
     flaw_path = [
         'C:/Users/DeepLearning/Desktop/flaw_detect/img/test/flaw01',
         'C:/Users/DeepLearning/Desktop/flaw_detect/img/test/flaw02',
@@ -94,20 +94,20 @@ def train():
             optim_D.step()
 
             # 训练AE生成器
-            if global_step % 50 == 0:
-                recon_img, _ = model(noise_img_tensor)
-                recon_loss = criterion_G(recon_img, img_tensor)
-                loss_G = recon_loss
-                optim_G.zero_grad()
-                loss_G.backward()
-                optim_G.step()
+            # if global_step % 50 == 0:
+            recon_img, _ = model(noise_img_tensor)
+            recon_loss = criterion_G(recon_img, img_tensor)
+            loss_G = recon_loss
+            optim_G.zero_grad()
+            loss_G.backward()
+            optim_G.step()
 
-                _, recon_prob = model(noise_img_tensor)
-                lie_loss = criterion_D(recon_prob, target_recon_soft)
-                loss_G = lie_loss
-                optim_G.zero_grad()
-                loss_G.backward()
-                optim_G.step()
+            _, recon_prob = model(noise_img_tensor)
+            lie_loss = criterion_D(recon_prob, target_recon_soft)
+            loss_G = lie_loss
+            optim_G.zero_grad()
+            loss_G.backward()
+            optim_G.step()
 
 
             if lr_warmup_G is not None:
@@ -144,10 +144,10 @@ def train():
                           'detect_loss': [],
                           'real_loss': []}
                 # 输出网络权重和梯度
-                for tag, value in model.named_parameters():
-                    tag = tag.replace('.', '/')
-                    writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step // show_interval)
-                    writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), global_step // show_interval)
+                # for tag, value in model.named_parameters():
+                #     tag = tag.replace('.', '/')
+                #     writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step // show_interval)
+                #     writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), global_step // show_interval)
                 # 对瑕疵进行测试
                 for p in flaw_path:
                     get_img_paths = os.listdir(p)

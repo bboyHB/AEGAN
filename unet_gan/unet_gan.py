@@ -3,7 +3,7 @@
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-from .unet_gan_parts import *
+from unet_gan_parts import *
 
 
 class UNetGenerator(nn.Module):
@@ -24,7 +24,7 @@ class UNetGenerator(nn.Module):
         self.up3 = Up(256, 128 // factor, bilinear)
         self.up4 = Up(128, 64, bilinear)
         self.outc = OutConv(64, n_classes)
-        self.sigmoid = nn.Sigmoid()
+        self.tanh = nn.Tanh()
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -37,7 +37,7 @@ class UNetGenerator(nn.Module):
         x = self.up3(x, x2)
         x = self.up4(x, x1)
         logits = self.outc(x)
-        out = self.sigmoid(logits)
+        out = self.tanh(logits)
         return out
 
 
@@ -71,29 +71,35 @@ class UNetDiscriminator(nn.Module):
 
 
 class UNetGAN(nn.Module):
-    def __init__(self, pretrained_unet_G=None):
+    def __init__(self, pretrained_unet_G=None, bilinear=True):
         super(UNetGAN, self).__init__()
         self.netG = pretrained_unet_G
-        if self.netG == None:
-            self.netG = UNetGenerator()
-        self.netD = UNetDiscriminator()
+        if self.netG is None:
+            self.netG = UNetGenerator(bilinear=bilinear)
+        self.netD = UNetDiscriminator(bilinear=bilinear)
 
-    def forward(self, x, train=True, judge_img=None):
+    def forward(self, x, gt_img=None):
         img_G = self.netG(x)
-        if train:
-            if judge_img is None:
-                pair = torch.cat((img_G, x), dim=1)
-            else:
-                pair = torch.cat((judge_img, x), dim=1)
-            fake_or_true = self.netD(pair)
-            return img_G, fake_or_true
-        return img_G
+        if self.training:
+            assert gt_img is not None, 'no gt img'
+            pair_fake = torch.cat((img_G, x), dim=1)
+            pair_real = torch.cat((gt_img, x), dim=1)
+            judge_fake = self.netD(pair_fake)
+            judge_real = self.netD(pair_real)
+            return img_G, judge_fake, judge_real
+        else:
+            assert gt_img is None, 'no need for gt img'
+            return img_G
 
 
 
 if __name__ == '__main__':
-    u = UNetGenerator().cuda()
-    t = torch.rand((1, 3, 1024, 768)).cuda()
-    i = u(t)
-    print(i.shape)
+    ug = UNetGAN(bilinear=False)
+    t = torch.rand((1, 3, 512, 386))
+    ug.eval()
+    i = ug(t, t)
+    # u = UNetGenerator().cuda()
+    # t = torch.rand((1, 3, 1024, 768)).cuda()
+    # i = u(t)
+    # print(i.shape)
     pass

@@ -139,65 +139,6 @@ def fine_tune(model_path=None):
     return ae
 
 
-def Unet_repair():
-    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-    ae = UNetGenerator(bilinear=False).to(device)
-    criterion = nn.L1Loss()
-
-    optimizer = SGD(ae.parameters(), lr=config.lr, momentum=0.9, weight_decay=1e-8)
-    step_lr = StepLR(optimizer, config.lr_step, config.lr_decay_gamma)
-
-    data_path = 'paste_good'
-    stamp = 'UNET_funetune_e' + str(config.epoch) + '_lr' + str(config.lr)
-    time_stamp = "{0:%Y-%m-%d_%H-%M-%S}".format(datetime.now())
-    writer = SummaryWriter(log_dir='aelog/' + stamp + '_' + time_stamp)
-
-    glbstep = 0
-    for e in range(config.epoch):
-        if e > 0:
-            criterion = FocalLossG(2)
-        classes = os.listdir(data_path)
-        for cls in classes:
-            origin_img_path = os.path.join(data_path, cls, 'origin')
-            pasted_img_path = os.path.join(data_path, cls, 'pasted')
-            for index, img_name in enumerate(os.listdir(origin_img_path)):
-                print(e, cls, index)
-                origin_img = Image.open(os.path.join(origin_img_path, img_name))
-                pasted_img = Image.open(os.path.join(pasted_img_path, img_name))
-                origin_img = origin_img.resize((768, 576))
-                pasted_img = pasted_img.resize((768, 576))  # (768, 576)
-                origin_img_tensor = F.to_tensor(origin_img).unsqueeze(0).to(device)
-                pasted_img_tensor = F.to_tensor(pasted_img).unsqueeze(0).to(device)
-
-                output = ae(origin_img_tensor)
-                loss = criterion(output, pasted_img_tensor)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                glbstep += 1
-                writer.add_scalar(tag='Train/loss', scalar_value=loss.item(), global_step=glbstep)
-                if glbstep % 100 == 0:
-                    writer.add_image('img/input', origin_img_tensor.squeeze(), glbstep)
-                    writer.add_image('img/output', output.squeeze(), glbstep)
-                    writer.add_image('img/pasted', pasted_img_tensor.squeeze(), glbstep)
-                    input_numpy = origin_img_tensor.squeeze().cpu().numpy().transpose((1, 2, 0))
-                    input_gray = cv2.cvtColor(input_numpy, cv2.COLOR_RGB2GRAY)
-                    input_LBP = local_binary_pattern(input_gray, P=8, R=1)
-                    output_numpy = output.squeeze().cpu().detach().numpy().transpose((1, 2, 0))
-                    output_gray = cv2.cvtColor(output_numpy, cv2.COLOR_RGB2GRAY)
-                    output_LBP = local_binary_pattern(output_gray, P=8, R=1)
-                    # writer.add_image('diff/LBP', np.abs(input_LBP - output_LBP), glbstep, dataformats='HW')
-                    bin_img = np.array(np.abs(input_LBP - output_LBP) > 230, dtype=np.uint8)
-                    writer.add_image('diff/LBP_bin', bin_img * 255, glbstep, dataformats='HW')
-                    filtered_img = extract_flaws(bin_img)
-                    writer.add_image('diff/LBP_filter_bin', filtered_img * 255, glbstep, dataformats='HW')
-        step_lr.step()
-    torch.save(ae, stamp + time_stamp + '.pth')
-    return ae
-
-
 if __name__ == '__main__':
     fine_tune('')
     # tensorboard --logdir=aelog

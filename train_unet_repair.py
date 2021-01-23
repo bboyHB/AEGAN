@@ -81,11 +81,11 @@ def Unet_repair_autodata():
             # 判别器
             pair_fake = torch.cat((img_G.detach(), noise_img_defect_tensor), dim=1)
             judge_fake = D(pair_fake)
-            detect_loss = criterion_D(judge_fake, gt_recon_soft)
+            detect_loss = criterion_D(judge_fake.squeeze(0).squeeze(0), gt_recon_soft)
 
             pair_real = torch.cat((img_origin_tensor, noise_img_defect_tensor), dim=1)
             judge_real = D(pair_real)
-            real_loss = criterion_D(judge_real, gt_real_soft)
+            real_loss = criterion_D(judge_real.squeeze(0).squeeze(0), gt_real_soft)
 
             D_loss = detect_loss + real_loss
             optimizer_D.zero_grad()
@@ -95,9 +95,9 @@ def Unet_repair_autodata():
             glbstep = e * iters_per_epoch + i
 
             if glbstep % 100 == 0:
-                writer.add_image('img/input', noise_img_defect_tensor.squeeze(), glbstep)
-                writer.add_image('img/output', img_G.squeeze(), glbstep)
-                writer.add_image('img/origin', img_origin_tensor.squeeze(), glbstep)
+                writer.add_image('img/input', noise_img_defect_tensor.squeeze() / 2 + 0.5, glbstep)
+                writer.add_image('img/output', img_G.squeeze() / 2 + 0.5, glbstep)
+                writer.add_image('img/origin', img_origin_tensor.squeeze() / 2 + 0.5, glbstep)
                 # input_numpy = origin_img_tensor.squeeze().cpu().numpy().transpose((1, 2, 0))
                 # input_gray = cv2.cvtColor(input_numpy, cv2.COLOR_RGB2GRAY)
                 # input_LBP = local_binary_pattern(input_gray, P=8, R=1)

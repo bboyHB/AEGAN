@@ -24,10 +24,9 @@ trans2tensor = transforms.Compose([
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 iters_per_epoch = 1000
-
+device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
 def Unet_repair_autodata():
-    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     ug = UNetGAN(bilinear=True).to(device)
     criterion_G = nn.MSELoss()
     criterion_D = nn.BCELoss()
@@ -112,7 +111,6 @@ def Unet_repair_autodata():
 
 
 def Unet_repair_data():
-    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     ug = UNetGAN(bilinear=True).to(device)
     criterion1 = nn.MSELoss()
     criterion2 = nn.BCELoss()

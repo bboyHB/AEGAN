@@ -16,7 +16,7 @@ from torchvision.transforms import functional as F
 from config import config
 from FocalLoss2d import FocalLossG
 from unet_gan.unet_gan import UNetGenerator, UNetDiscriminator
-from defect_generate_gan.dg_gan import add_defect
+from defect_generate_gan.dg_gan import add_defect, Generator, Discriminator
 
 
 trans2tensor = transforms.Compose([
@@ -46,8 +46,8 @@ def Unet_repair_autodata():
         # if e > 0:
         #     criterion = FocalLossG(2)
         for i in tqdm(range(iters_per_epoch)):
-            bg_imgs = os.listdir('normal_sample')
-            img_origin = Image.open(os.path.join('normal_sample', bg_imgs[random.randint(0, len(bg_imgs) - 1)])).convert('RGB')
+            bg_imgs = os.listdir('defect_generate_gan/normal_sample')
+            img_origin = Image.open(os.path.join('defect_generate_gan/normal_sample', bg_imgs[random.randint(0, len(bg_imgs) - 1)])).convert('RGB')
             img_numpy = np.array(img_origin)
             img_origin_tensor = trans2tensor(img_origin).unsqueeze(0).to(device)
             img_defect = Image.fromarray(add_defect(img_numpy)).convert('RGB')
@@ -65,31 +65,31 @@ def Unet_repair_autodata():
             gt_real_soft = torch.tensor(np.random.uniform(0.0, 0.3, (img_origin_tensor.shape[0], 1)), dtype=torch.float).to(device)
             target_recon_soft = torch.tensor(np.random.uniform(0.0, 0.3, (img_origin_tensor.shape[0], 1)), dtype=torch.float).to(device)
 
+            # 生成器
             img_G = G(noise_img_defect_tensor)
             recon_loss = criterion_G(img_G, img_origin_tensor)
-            optimizer_G.zero_grad()
-            recon_loss.backward()
-            optimizer_G.step()
 
             pair_fake = torch.cat((img_G, noise_img_defect_tensor), dim=1)
             judge_fake = D(pair_fake)
             lie_loss = criterion_D(judge_fake.squeeze(0).squeeze(0), target_recon_soft)
+
+            G_loss = recon_loss + lie_loss
             optimizer_G.zero_grad()
-            lie_loss.backward()
+            G_loss.backward()
             optimizer_G.step()
 
+            # 判别器
             pair_fake = torch.cat((img_G.detach(), noise_img_defect_tensor), dim=1)
             judge_fake = D(pair_fake)
             detect_loss = criterion_D(judge_fake, gt_recon_soft)
-            optimizer_D.zero_grad()
-            detect_loss.backward()
-            optimizer_D.step()
 
             pair_real = torch.cat((img_origin_tensor, noise_img_defect_tensor), dim=1)
             judge_real = D(pair_real)
             real_loss = criterion_D(judge_real, gt_real_soft)
+
+            D_loss = detect_loss + real_loss
             optimizer_D.zero_grad()
-            real_loss.backward()
+            D_loss.backward()
             optimizer_D.step()
 
             glbstep = e * iters_per_epoch + i
@@ -111,7 +111,8 @@ def Unet_repair_autodata():
                 # writer.add_image('diff/LBP_filter_bin', filtered_img * 255, glbstep, dataformats='HW')
         step_lr_G.step()
         step_lr_D.step()
-    torch.save(ug, stamp + time_stamp + '.pth')
+    torch.save(G, stamp + time_stamp + '_G.pth')
+    torch.save(D, stamp + time_stamp + '_D.pth')
 
 
 def Unet_repair_data():
